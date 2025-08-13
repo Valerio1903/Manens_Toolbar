@@ -473,19 +473,28 @@ def write_appends_pipe(sheet, start_row, headers, rows_data):
     return n_rows
 
 def sort_data_region_pipe(sheet, headers):
-    r0, r1 = detect_data_region_pipe(sheet, headers)
-    if r1 < r0:
-        return
+    r0 = MIN_START_DATA_ROW_PIPE
     first_col = 1
     last_col = sheet.Cells(HEADER_ROW_PIPE, sheet.Columns.Count).End(Excel.XlDirection.xlToLeft).Column
-    data_rng = sheet.Range[sheet.Cells(r0, first_col), sheet.Cells(r1, last_col)]
-    t_col = headers["Type Name"]; d_col = headers["Diameter"]
+
+    t_col = headers["Type Name"]
+    d_col = headers["Diameter"]
+
+    # ultima riga usata tra le colonne chiave
+    last_row = 0
+    for col in (t_col, d_col):
+        lr = sheet.Cells(sheet.Rows.Count, col).End(Excel.XlDirection.xlUp).Row
+        if lr > last_row: last_row = lr
+    if last_row < r0: return
+
+    data_rng = sheet.Range(sheet.Cells(r0, first_col), sheet.Cells(last_row, last_col))
+
     sort = sheet.Sort
     sort.SortFields.Clear()
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, t_col), sheet.Cells(r1, t_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, t_col), sheet.Cells(last_row, t_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, d_col), sheet.Cells(r1, d_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, d_col), sheet.Cells(last_row, d_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
     sort.SetRange(data_rng)
@@ -923,22 +932,31 @@ def write_appends_ins(sheet, start_row, headers, rows_data):
     return n_rows
 
 def sort_data_region_ins(sheet, headers):
-    r0, r1 = detect_data_region_ins(sheet, headers)
-    if r1 < r0:
-        return
+    r0 = MIN_START_DATA_ROW_INS
     first_col = 1
     last_col = sheet.Cells(HEADER_ROW_INS, sheet.Columns.Count).End(Excel.XlDirection.xlToLeft).Column
-    data_rng = sheet.Range[sheet.Cells(r0, first_col), sheet.Cells(r1, last_col)]
-    tn_col = headers["Type Name"]; th_col = headers["Insulation Thickness"]; sz_col = headers["Pipe Size"]
+
+    tn_col = headers["Type Name"]
+    th_col = headers["Insulation Thickness"]
+    sz_col = headers["Pipe Size"]
+
+    last_row = 0
+    for col in (tn_col, th_col, sz_col):
+        lr = sheet.Cells(sheet.Rows.Count, col).End(Excel.XlDirection.xlUp).Row
+        if lr > last_row: last_row = lr
+    if last_row < r0: return
+
+    data_rng = sheet.Range(sheet.Cells(r0, first_col), sheet.Cells(last_row, last_col))
+
     sort = sheet.Sort
     sort.SortFields.Clear()
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, tn_col), sheet.Cells(r1, tn_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, tn_col), sheet.Cells(last_row, tn_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, th_col), sheet.Cells(r1, th_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, th_col), sheet.Cells(last_row, th_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, sz_col), sheet.Cells(r1, sz_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, sz_col), sheet.Cells(last_row, sz_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
     sort.SetRange(data_rng)
@@ -1367,22 +1385,31 @@ def write_appends_batched_fit(sheet, start_row, headers, rows_data):
     return n_rows
 
 def sort_data_region_fit(sheet, headers):
-    r0, r1 = detect_data_region_fit(sheet, headers)
-    if r1 < r0:
-        return
+    r0 = MIN_START_DATA_ROW_FIT
     first_col = 1
     last_col = sheet.Cells(HEADER_ROW_FIT, sheet.Columns.Count).End(Excel.XlDirection.xlToLeft).Column
-    data_rng = sheet.Range[sheet.Cells(r0, first_col), sheet.Cells(r1, last_col)]
-    fam_col = headers["Family Name"]; typ_col = headers["Type Name"]; max_col = headers["MAN_Fittings_MaxSize"]
+
+    fam_col = headers["Family Name"]
+    typ_col = headers["Type Name"]
+    max_col = headers["MAN_Fittings_MaxSize"]
+
+    last_row = 0
+    for col in (fam_col, typ_col, max_col):
+        lr = sheet.Cells(sheet.Rows.Count, col).End(Excel.XlDirection.xlUp).Row
+        if lr > last_row: last_row = lr
+    if last_row < r0: return
+
+    data_rng = sheet.Range(sheet.Cells(r0, first_col), sheet.Cells(last_row, last_col))
+
     sort = sheet.Sort
     sort.SortFields.Clear()
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, fam_col), sheet.Cells(r1, fam_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, fam_col), sheet.Cells(last_row, fam_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, typ_col), sheet.Cells(r1, typ_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, typ_col), sheet.Cells(last_row, typ_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, max_col), sheet.Cells(r1, max_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, max_col), sheet.Cells(last_row, max_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
     sort.SetRange(data_rng)
@@ -1793,22 +1820,31 @@ def MEQ_write_appends(sheet, start_row, headers, rows_data):
     return n_rows
 
 def MEQ_sort_data_region(sheet, headers):
-    r0, r1 = MEQ_detect_data_region(sheet, headers)
-    if r1 < r0:
-        return
+    r0 = MEQ_MIN_START_DATA_ROW
     first_col = 1
     last_col = sheet.Cells(MEQ_HEADER_ROW, sheet.Columns.Count).End(Excel.XlDirection.xlToLeft).Column
-    data_rng = sheet.Range[sheet.Cells(r0, first_col), sheet.Cells(r1, last_col)]
-    fam_col = headers["Family Name"]; typ_col = headers["Type Name"]; code_col = headers["MAN_Type_Code"]
+
+    fam_col = headers["Family Name"]
+    typ_col = headers["Type Name"]
+    code_col = headers["MAN_Type_Code"]
+
+    last_row = 0
+    for col in (fam_col, typ_col, code_col):
+        lr = sheet.Cells(sheet.Rows.Count, col).End(Excel.XlDirection.xlUp).Row
+        if lr > last_row: last_row = lr
+    if last_row < r0: return
+
+    data_rng = sheet.Range(sheet.Cells(r0, first_col), sheet.Cells(last_row, last_col))
+
     sort = sheet.Sort
     sort.SortFields.Clear()
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, fam_col), sheet.Cells(r1, fam_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, fam_col), sheet.Cells(last_row, fam_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, typ_col), sheet.Cells(r1, typ_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, typ_col), sheet.Cells(last_row, typ_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, code_col), sheet.Cells(r1, code_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, code_col), sheet.Cells(last_row, code_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
     sort.SetRange(data_rng)
@@ -2203,24 +2239,29 @@ def GEN_write_appends(sheet, start_row, headers, rows_data):
     return n_rows
 
 def GEN_sort_data_region(sheet, headers):
-    r0, r1 = GEN_detect_data_region(sheet, headers)
-    if r1 < r0:
-        return
+    r0 = GEN_MIN_START_DATA_ROW
     first_col = 1
     last_col = sheet.Cells(GEN_HEADER_ROW, sheet.Columns.Count).End(Excel.XlDirection.xlToLeft).Column
-    data_rng = sheet.Range(sheet.Cells(r0, first_col), sheet.Cells(r1, last_col))
-    fam_col = headers["Family Name"]; typ_col = headers["Type Name"]
+
+    fam_col = headers["Family Name"]
+    typ_col = headers["Type Name"]
+
+    last_row = 0
+    for col in (fam_col, typ_col):
+        lr = sheet.Cells(sheet.Rows.Count, col).End(Excel.XlDirection.xlUp).Row
+        if lr > last_row: last_row = lr
+    if last_row < r0: return
+
+    data_rng = sheet.Range(sheet.Cells(r0, first_col), sheet.Cells(last_row, last_col))
 
     sort = sheet.Sort
     sort.SortFields.Clear()
-
-    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, fam_col), sheet.Cells(r1, fam_col)),
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, fam_col), sheet.Cells(last_row, fam_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
-    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, typ_col), sheet.Cells(r1, typ_col)),
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, typ_col), sheet.Cells(last_row, typ_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
-
     sort.SetRange(data_rng)
     sort.Header = Excel.XlYesNoGuess.xlNo
     sort.MatchCase = False
@@ -2636,22 +2677,44 @@ def write_appends_batched_duct(sheet, start_row, headers, rows_data):
     return n_rows
 
 def sort_data_region_duct(sheet, headers):
-    r0, r1 = detect_data_region_duct(sheet, headers)
-    if r1 < r0:
-        return
-    first_col = 1
+    r0 = MIN_START_DATA_ROW_DUCT
     last_col = sheet.Cells(HEADER_ROW_DUCT, sheet.Columns.Count).End(Excel.XlDirection.xlToLeft).Column
-    data_rng = sheet.Range(sheet.Cells(r0, first_col), sheet.Cells(r1, last_col))
-    t_col = headers["Type Name"]; s_col = headers["Width/Height - Diameter"]
+
+    # Trova l'ultima riga piena considerando le colonne chiave
+    tn_col = headers["Type Name"]
+    sz_col = headers["Width/Height - Diameter"]
+
+    last_used_rows = []
+    for col in (tn_col, sz_col):
+        try:
+            r = sheet.Cells(sheet.Rows.Count, col).End(Excel.XlDirection.xlUp).Row
+            last_used_rows.append(r)
+        except:
+            pass
+
+    r1 = max([r for r in last_used_rows if r >= r0] or [r0 - 1])
+    if r1 < r0:
+        return  # niente da ordinare
+
+    data_rng = sheet.Range(sheet.Cells(r0, 1), sheet.Cells(r1, last_col))
 
     sort = sheet.Sort
     sort.SortFields.Clear()
-    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, t_col), sheet.Cells(r1, t_col)),
-                        SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
-                        DataOption=Excel.XlSortDataOption.xlSortNormal)
-    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, s_col), sheet.Cells(r1, s_col)),
-                        SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
-                        DataOption=Excel.XlSortDataOption.xlSortNormal)
+
+    # Ordine: Type Name -> Width/Height - Diameter
+    sort.SortFields.Add(
+        Key=sheet.Range(sheet.Cells(r0, tn_col), sheet.Cells(r1, tn_col)),
+        SortOn=Excel.XlSortOn.xlSortOnValues,
+        Order=Excel.XlSortOrder.xlAscending,
+        DataOption=Excel.XlSortDataOption.xlSortNormal
+    )
+    sort.SortFields.Add(
+        Key=sheet.Range(sheet.Cells(r0, sz_col), sheet.Cells(r1, sz_col)),
+        SortOn=Excel.XlSortOn.xlSortOnValues,
+        Order=Excel.XlSortOrder.xlAscending,
+        DataOption=Excel.XlSortDataOption.xlSortNormal
+    )
+
     sort.SetRange(data_rng)
     sort.Header = Excel.XlYesNoGuess.xlNo
     sort.MatchCase = False
@@ -3088,19 +3151,27 @@ def write_appends_din(sheet, start_row, headers, rows_data):
     return n_rows
 
 def sort_data_region_din(sheet, headers):
-    r0, r1 = detect_data_region_din(sheet, headers)
-    if r1 < r0:
-        return
+    r0 = DIN_MIN_START_DATA_ROW
     first_col = 1
     last_col = sheet.Cells(DIN_HEADER_ROW, sheet.Columns.Count).End(Excel.XlDirection.xlToLeft).Column
-    data_rng = sheet.Range[sheet.Cells(r0, first_col), sheet.Cells(r1, last_col)]
-    tn_col = headers["Type Name"]; th_col = headers["Insulation Thickness"]
+
+    tn_col = headers["Type Name"]
+    th_col = headers["Insulation Thickness"]
+
+    last_row = 0
+    for col in (tn_col, th_col):
+        lr = sheet.Cells(sheet.Rows.Count, col).End(Excel.XlDirection.xlUp).Row
+        if lr > last_row: last_row = lr
+    if last_row < r0: return
+
+    data_rng = sheet.Range(sheet.Cells(r0, first_col), sheet.Cells(last_row, last_col))
+
     sort = sheet.Sort
     sort.SortFields.Clear()
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, tn_col), sheet.Cells(r1, tn_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, tn_col), sheet.Cells(last_row, tn_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, th_col), sheet.Cells(r1, th_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, th_col), sheet.Cells(last_row, th_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
     sort.SetRange(data_rng)
@@ -3525,22 +3596,31 @@ def DFT_write_appends_batched(sheet, start_row, headers, rows_data):
     return n_rows
 
 def DFT_sort_data_region(sheet, headers):
-    r0, r1 = DFT_detect_data_region(sheet, headers)
-    if r1 < r0:
-        return
+    r0 = DFT_MIN_START_DATA_ROW
     first_col = 1
     last_col = sheet.Cells(DFT_HEADER_ROW, sheet.Columns.Count).End(Excel.XlDirection.xlToLeft).Column
-    data_rng = sheet.Range[sheet.Cells(r0, first_col), sheet.Cells(r1, last_col)]
-    fam_col = headers["Family Name"]; typ_col = headers["Type Name"]; max_col = headers["MAN_Fittings_MaxSize"]
+
+    fam_col = headers["Family Name"]
+    typ_col = headers["Type Name"]
+    max_col = headers["MAN_Fittings_MaxSize"]
+
+    last_row = 0
+    for col in (fam_col, typ_col, max_col):
+        lr = sheet.Cells(sheet.Rows.Count, col).End(Excel.XlDirection.xlUp).Row
+        if lr > last_row: last_row = lr
+    if last_row < r0: return
+
+    data_rng = sheet.Range(sheet.Cells(r0, first_col), sheet.Cells(last_row, last_col))
+
     sort = sheet.Sort
     sort.SortFields.Clear()
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, fam_col), sheet.Cells(r1, fam_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, fam_col), sheet.Cells(last_row, fam_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, typ_col), sheet.Cells(r1, typ_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, typ_col), sheet.Cells(last_row, typ_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
-    sort.SortFields.Add(Key=sheet.Range[sheet.Cells(r0, max_col), sheet.Cells(r1, max_col)],
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, max_col), sheet.Cells(last_row, max_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
     sort.SetRange(data_rng)
@@ -3941,19 +4021,27 @@ def fxd_write_appends(sheet, start_row, headers, rows_data):
     return n_rows
 
 def fxd_sort_data_region(sheet, headers):
-    r0, r1 = fxd_detect_data_region(sheet, headers)
-    if r1 < r0:
-        return
+    r0 = FXD_MIN_START_DATA_ROW
     first_col = 1
     last_col = sheet.Cells(FXD_HEADER_ROW, sheet.Columns.Count).End(Excel.XlDirection.xlToLeft).Column
-    data_rng = sheet.Range(sheet.Cells(r0, first_col), sheet.Cells(r1, last_col))
-    t_col = headers["Type Name"]; d_col = headers["Diameter"]
+
+    tn_col = headers["Type Name"]
+    d_col  = headers["Diameter"]
+
+    last_row = 0
+    for col in (tn_col, d_col):
+        lr = sheet.Cells(sheet.Rows.Count, col).End(Excel.XlDirection.xlUp).Row
+        if lr > last_row: last_row = lr
+    if last_row < r0: return
+
+    data_rng = sheet.Range(sheet.Cells(r0, first_col), sheet.Cells(last_row, last_col))
+
     sort = sheet.Sort
     sort.SortFields.Clear()
-    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, t_col), sheet.Cells(r1, t_col)),
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, tn_col), sheet.Cells(last_row, tn_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
-    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, d_col), sheet.Cells(r1, d_col)),
+    sort.SortFields.Add(Key=sheet.Range(sheet.Cells(r0, d_col), sheet.Cells(last_row, d_col)),
                         SortOn=Excel.XlSortOn.xlSortOnValues, Order=Excel.XlSortOrder.xlAscending,
                         DataOption=Excel.XlSortDataOption.xlSortNormal)
     sort.SetRange(data_rng)
