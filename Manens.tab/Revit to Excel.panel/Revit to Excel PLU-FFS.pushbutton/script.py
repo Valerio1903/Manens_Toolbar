@@ -2202,7 +2202,9 @@ def GEN_sort_data_region(sheet, headers):
 # -------------------------- RUN -----------------------------
 def run_general_into_workbook(workbook):
     elems = []
-    for bic in (BuiltInCategory.OST_PipeAccessory,
+    for bic in (BuiltInCategory.OST_DuctTerminal,
+                BuiltInCategory.OST_DuctAccessory,
+                BuiltInCategory.OST_PipeAccessory,
                 BuiltInCategory.OST_PlumbingFixtures,
                 BuiltInCategory.OST_Sprinklers):
         elems.extend(
@@ -2344,3 +2346,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
