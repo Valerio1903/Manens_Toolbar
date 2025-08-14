@@ -4088,13 +4088,11 @@ def main():
     run_tray_sep = form.chkTraySep.Checked
     run_cond = form.chkCond.Checked
     run_eeq  = form.chkEEQ.Checked
+    run_gen  = form.chkGen.Checked
     run_pipe = form.chkPipe.Checked
     run_fit  = form.chkFit.Checked
-    run_gen  = form.chkGen.Checked
     run_duct = form.chkDuct.Checked
     run_dft = form.chkDft.Checked
-
-
 
 
     if not (run_tray or run_tray_sep or run_cond or run_eeq or run_pipe or run_fit or run_gen or run_duct or run_dft):
