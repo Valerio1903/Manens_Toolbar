@@ -1320,12 +1320,19 @@ def run_conduits_into_workbook(workbook):
     for e in elems:
         cat  = PAS_category_name(e) or "Conduits"
         tnm  = PAS_type_name(e) or ""
-        if not tnm: continue
+        if not tnm:
+            continue
+
+        # --- PREFILTRO: escludi i "Cavidotti Speciali" già gestiti altrove ---
+        tnlc = tnm.lower()
+        if ("thermocable" in tnlc) or ("airsampling" in tnlc):
+            continue
+
         desc = PAS_type_desc(e) or ""
         pref = PAS_type_param_text(e, "MAN_FamilyTypePrefix") or ""
 
         d_key, d_val = COND_outside_diam_mm_key(e)
-        if d_key <= 0:  # ignora senza diametro
+        if d_key <= 0:
             continue
 
         t_key = PAS_norm_text_strong(tnm)
@@ -1337,6 +1344,7 @@ def run_conduits_into_workbook(workbook):
         else:
             if not inner[d_key][2]: inner[d_key][2] = desc
             if not inner[d_key][3]: inner[d_key][3] = pref
+
 
     # Ordina per Type Name, poi Outside Diameter (mm)
     rows_tmp = []
@@ -2194,10 +2202,12 @@ def GEN_sort_data_region(sheet, headers):
 def run_general_into_workbook(workbook):
     elems = []
     for bic in (BuiltInCategory.OST_CableTrayFitting,
+                BuiltInCategory.OST_ConduitFitting,
                 BuiltInCategory.OST_ElectricalEquipment,
                 BuiltInCategory.OST_ElectricalFixtures,
                 BuiltInCategory.OST_LightingDevices,
                 BuiltInCategory.OST_LightingFixtures):
+
         elems.extend(
             list(FilteredElementCollector(doc).OfCategory(bic).WhereElementIsNotElementType().ToElements())
         )
@@ -2214,6 +2224,15 @@ def run_general_into_workbook(workbook):
                     continue
         except:
             pass
+        try:
+            if e.Category and e.Category.Id.IntegerValue == int(BuiltInCategory.OST_ConduitFitting):
+                tname_raw = GEN_type_name(e) or ""
+                tnlc = tname_raw.lower()
+                if ("thermocable" in tnlc) or ("airsampling" in tnlc):
+                    continue
+        except:
+            pass
+
         
         cat  = GEN_category_name(e) or ""
         fam  = GEN_family_name(e) or ""
