@@ -29,7 +29,7 @@ from Microsoft.Office.Interop import Excel
 clr.AddReference("RevitAPI")
 from Autodesk.Revit.DB import (
     FilteredElementCollector, BuiltInParameter, BuiltInCategory, FamilyInstance,
-    Transaction, StorageType
+    Transaction, TransactionStatus, StorageType
 )
 from Autodesk.Revit.DB.Plumbing import Pipe, PipeInsulation
 from Autodesk.Revit.DB.Mechanical import Duct, FlexDuct, DuctInsulation
@@ -133,11 +133,12 @@ def xl_read_column_block(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
-            try: val = data.GetValue(i, 0)
-            except:
-                try: val = data.GetValue(i+1, 1)
-                except: val = None
+            try: val = data.GetValue(i + lb0, lb1)
+            except: val = None
             out.append(norm_text(val))
         return out
     if isinstance(data, (tuple, list)):
@@ -204,12 +205,26 @@ def build_row_map(sheet, header_row, min_row, key_cols_names, key_builder, numer
     if not (pc_col or uq_col):
         return {}, (r0, r1), headers, "mancano MAN_ProductCode/MAN_BoQ_Units"
 
+    # Lettura BULK dell'intera regione dati: una sola chiamata COM invece
+    # di una per cella (ogni Cells().Value2 e' un round-trip verso Excel).
+    max_col = max(headers.values()) if headers else 1
+    _blk = sheet.Range[sheet.Cells(r0, 1), sheet.Cells(r1, max_col)].Value2
+    if isinstance(_blk, System.Array) and _blk.Rank == 2:
+        _lb0 = _blk.GetLowerBound(0); _lb1 = _blk.GetLowerBound(1)
+        def get(r, c):
+            try: return _blk.GetValue(r - r0 + _lb0, c - 1 + _lb1)
+            except: return None
+    else:
+        _scal = _blk
+        def get(r, c):
+            return _scal if (r == r0 and c == 1) else None
+
     result = {}
     for r in range(r0, r1+1):
-        key = key_builder(headers, r)
+        key = key_builder(headers, r, get)
         if not key: continue
-        pc = sheet.Cells(r, pc_col).Value2 if pc_col else None
-        uq = sheet.Cells(r, uq_col).Value2 if uq_col else None
+        pc = get(r, pc_col) if pc_col else None
+        uq = get(r, uq_col) if uq_col else None
         if (pc is None or U(pc).strip()==u"") and (uq is None or U(uq).strip()==u""):
             continue
         result[key] = (U(pc).strip() if pc is not None else u"", U(uq).strip() if uq is not None else u"")
@@ -353,11 +368,11 @@ def import_pipe(sheet):
         if not dkey: continue
         idx.setdefault((t, dkey), []).append(p)
 
-    def key_builder(headers, r):
+    def key_builder(headers, r, get):
         tcol = headers.get("Type Name"); dcol = headers.get("Diameter")
         if not (tcol and dcol): return None
-        t = norm_strong(sheet.Cells(r, tcol).Value2 or u"")
-        raw = U(sheet.Cells(r, dcol).Value2 or u"")
+        t = norm_strong(get(r, tcol) or u"")
+        raw = U(get(r, dcol) or u"")
         s = raw.replace(",", "."); m = re.search(r'(\d+(?:\.\d+)?)', s)
         dkey = ""
         if m:
@@ -375,8 +390,11 @@ def import_pipe(sheet):
             for e in idx.get(k, []):
                 if apply_two_params(e, pc, uq, stats): stats["updated_elems"] += 1
             if k in idx: stats["matched_keys"] += 1
-    finally:
         t.Commit()
+    except:
+        if t.GetStatus() == TransactionStatus.Started:
+            t.RollBack()
+        raise
     print("[PIPE] Chiavi:", stats["matched_keys"], "| Istanze aggiornate:", stats["updated_elems"])
 
 # 2) ISOLANTE TUBAZIONI (Pipe Insulations): [Type + Thickness + Pipe Size]
@@ -420,13 +438,13 @@ def import_pipe_ins(sheet):
         if not (t or thkey or szkey): continue
         idx.setdefault((t, thkey or "0", szkey), []).append(ins)
 
-    def key_builder(headers, r):
+    def key_builder(headers, r, get):
         tcol = headers.get("Type Name"); thcol = headers.get("Insulation Thickness"); szcol = headers.get("Pipe Size")
         if not (tcol and thcol and szcol): return None
-        t  = norm_strong(sheet.Cells(r, tcol).Value2 or u"")
-        th = to_float_dot(sheet.Cells(r, thcol).Value2); thk = ""
+        t  = norm_strong(get(r, tcol) or u"")
+        th = to_float_dot(get(r, thcol)); thk = ""
         if th is not None: thk = ("%.6f" % th).rstrip("0").rstrip(".")
-        sz = U(sheet.Cells(r, szcol).Value2 or u"")
+        sz = U(get(r, szcol) or u"")
         sz = re.sub(u"[ΦφØø⌀]", u"", sz)
         m = re.search(r'(\d+(?:[.,]\d+)?)', sz.replace(",", "."))
         szk = ""
@@ -445,8 +463,11 @@ def import_pipe_ins(sheet):
             for e in idx.get(k, []):
                 if apply_two_params(e, pc, uq, stats): stats["updated_elems"] += 1
             if k in idx: stats["matched_keys"] += 1
-    finally:
         t.Commit()
+    except:
+        if t.GetStatus() == TransactionStatus.Started:
+            t.RollBack()
+        raise
     print("[PIPE INS] Chiavi:", stats["matched_keys"], "| Istanze aggiornate:", stats["updated_elems"])
 
 # 3) RACCORDI TUBI (Pipe Fittings): [Family + Type + MaxSize mm]
@@ -461,12 +482,12 @@ def import_pfit(sheet):
         if not (fam or typ or msz): continue
         idx.setdefault((fam, typ, msz), []).append(e)
 
-    def key_builder(headers, r):
+    def key_builder(headers, r, get):
         fcol = headers.get("Family Name"); tcol = headers.get("Type Name"); mcol = headers.get("MAN_Fittings_MaxSize")
         if not (fcol and tcol and mcol): return None
-        fam = norm_strong(sheet.Cells(r, fcol).Value2 or u"")
-        typ = norm_strong(sheet.Cells(r, tcol).Value2 or u"")
-        mv  = to_float_dot(sheet.Cells(r, mcol).Value2); mk = round(mv, 6) if mv is not None else 0.0
+        fam = norm_strong(get(r, fcol) or u"")
+        typ = norm_strong(get(r, tcol) or u"")
+        mv  = to_float_dot(get(r, mcol)); mk = round(mv, 6) if mv is not None else 0.0
         if not (fam or typ or mk): return None
         return (fam, typ, mk)
 
@@ -479,8 +500,11 @@ def import_pfit(sheet):
             for e in idx.get(k, []):
                 if apply_two_params(e, pc, uq, stats): stats["updated_elems"] += 1
             if k in idx: stats["matched_keys"] += 1
-    finally:
         t.Commit()
+    except:
+        if t.GetStatus() == TransactionStatus.Started:
+            t.RollBack()
+        raise
     print("[PFIT] Chiavi:", stats["matched_keys"], "| Istanze aggiornate:", stats["updated_elems"])
 
 # 4) APPARECCHIATURE MEC (Mechanical Equipment): [Family + Type + MAN_Type_Code]
@@ -494,12 +518,12 @@ def import_meq(sheet):
         code = norm_strong(eq_instance_param(e, "MAN_Type_Code") or "")
         idx.setdefault((fam, typ, code), []).append(e)
 
-    def key_builder(headers, r):
+    def key_builder(headers, r, get):
         fcol = headers.get("Family Name"); tcol = headers.get("Type Name"); ccol = headers.get("MAN_Type_Code")
         if not (fcol and tcol and ccol): return None
-        fam = norm_strong(sheet.Cells(r, fcol).Value2 or u"")
-        typ = norm_strong(sheet.Cells(r, tcol).Value2 or u"")
-        code = norm_strong(sheet.Cells(r, ccol).Value2 or u"")
+        fam = norm_strong(get(r, fcol) or u"")
+        typ = norm_strong(get(r, tcol) or u"")
+        code = norm_strong(get(r, ccol) or u"")
         if not (fam or typ or code): return None
         return (fam, typ, code)
 
@@ -512,8 +536,11 @@ def import_meq(sheet):
             for e in idx.get(k, []):
                 if apply_two_params(e, pc, uq, stats): stats["updated_elems"] += 1
             if k in idx: stats["matched_keys"] += 1
-    finally:
         t.Commit()
+    except:
+        if t.GetStatus() == TransactionStatus.Started:
+            t.RollBack()
+        raise
     print("[MEQ] Chiavi:", stats["matched_keys"], "| Istanze aggiornate:", stats["updated_elems"])
 
 # 5) GENERALE (DuctTerminal / DuctAccessory / PipeAccessory / PlumbingFixtures / Sprinklers): [Family + Type]
@@ -534,11 +561,11 @@ def import_generale(sheet):
         if not (fam or typ): continue
         idx.setdefault((fam, typ), []).append(e)
 
-    def key_builder(headers, r):
+    def key_builder(headers, r, get):
         fcol = headers.get("Family Name"); tcol = headers.get("Type Name")
         if not (fcol and tcol): return None
-        fam = norm_strong(sheet.Cells(r, fcol).Value2 or u"")
-        typ = norm_strong(sheet.Cells(r, tcol).Value2 or u"")
+        fam = norm_strong(get(r, fcol) or u"")
+        typ = norm_strong(get(r, tcol) or u"")
         if not (fam or typ): return None
         return (fam, typ)
 
@@ -551,8 +578,11 @@ def import_generale(sheet):
             for e in idx.get(k, []):
                 if apply_two_params(e, pc, uq, stats): stats["updated_elems"] += 1
             if k in idx: stats["matched_keys"] += 1
-    finally:
         t.Commit()
+    except:
+        if t.GetStatus() == TransactionStatus.Started:
+            t.RollBack()
+        raise
     print("[GEN] Chiavi:", stats["matched_keys"], "| Istanze aggiornate:", stats["updated_elems"])
 
 # 6) CANALI RIGIDI (Ducts): [Type + MaxDim/Diameter mm]
@@ -566,11 +596,11 @@ def import_ducts(sheet):
         if sk <= 0: continue
         idx.setdefault((t, sk), []).append(d)
 
-    def key_builder(headers, r):
+    def key_builder(headers, r, get):
         tcol = headers.get("Type Name"); scol = headers.get("Width/Height - Diameter")
         if not (tcol and scol): return None
-        t = norm_strong(sheet.Cells(r, tcol).Value2 or u"")
-        sv = to_float_dot(sheet.Cells(r, scol).Value2); sk = round(sv, 6) if sv is not None else 0.0
+        t = norm_strong(get(r, tcol) or u"")
+        sv = to_float_dot(get(r, scol)); sk = round(sv, 6) if sv is not None else 0.0
         if not (t or sk): return None
         return (t, sk)
 
@@ -583,8 +613,11 @@ def import_ducts(sheet):
             for e in idx.get(k, []):
                 if apply_two_params(e, pc, uq, stats): stats["updated_elems"] += 1
             if k in idx: stats["matched_keys"] += 1
-    finally:
         t.Commit()
+    except:
+        if t.GetStatus() == TransactionStatus.Started:
+            t.RollBack()
+        raise
     print("[DUCT] Chiavi:", stats["matched_keys"], "| Istanze aggiornate:", stats["updated_elems"])
 
 # 7) ISOLAMENTO CANALI (Duct Insulation): [Type + Thickness]
@@ -619,11 +652,11 @@ def import_duct_ins(sheet):
         if not (t or th): continue
         idx.setdefault((t, th), []).append(ins)
 
-    def key_builder(headers, r):
+    def key_builder(headers, r, get):
         tcol = headers.get("Type Name"); thcol = headers.get("Insulation Thickness")
         if not (tcol and thcol): return None
-        t  = norm_strong(sheet.Cells(r, tcol).Value2 or u"")
-        th = to_float_dot(sheet.Cells(r, thcol).Value2); thk = ""
+        t  = norm_strong(get(r, tcol) or u"")
+        th = to_float_dot(get(r, thcol)); thk = ""
         if th is not None: thk = ("%.6f" % th).rstrip("0").rstrip(".")
         if not (t or thk): return None
         return (t, thk)
@@ -637,8 +670,11 @@ def import_duct_ins(sheet):
             for e in idx.get(k, []):
                 if apply_two_params(e, pc, uq, stats): stats["updated_elems"] += 1
             if k in idx: stats["matched_keys"] += 1
-    finally:
         t.Commit()
+    except:
+        if t.GetStatus() == TransactionStatus.Started:
+            t.RollBack()
+        raise
     print("[DUCT INS] Chiavi:", stats["matched_keys"], "| Istanze aggiornate:", stats["updated_elems"])
 
 # 8) FITTING CANALI (Duct Fittings): [Family + Type + MaxSize mm]
@@ -653,12 +689,12 @@ def import_dfit(sheet):
         if not (fam or typ or msz): continue
         idx.setdefault((fam, typ, msz), []).append(e)
 
-    def key_builder(headers, r):
+    def key_builder(headers, r, get):
         fcol = headers.get("Family Name"); tcol = headers.get("Type Name"); mcol = headers.get("MAN_Fittings_MaxSize")
         if not (fcol and tcol and mcol): return None
-        fam = norm_strong(sheet.Cells(r, fcol).Value2 or u"")
-        typ = norm_strong(sheet.Cells(r, tcol).Value2 or u"")
-        mv  = to_float_dot(sheet.Cells(r, mcol).Value2); mk = round(mv, 6) if mv is not None else 0.0
+        fam = norm_strong(get(r, fcol) or u"")
+        typ = norm_strong(get(r, tcol) or u"")
+        mv  = to_float_dot(get(r, mcol)); mk = round(mv, 6) if mv is not None else 0.0
         if not (fam or typ or mk): return None
         return (fam, typ, mk)
 
@@ -671,8 +707,11 @@ def import_dfit(sheet):
             for e in idx.get(k, []):
                 if apply_two_params(e, pc, uq, stats): stats["updated_elems"] += 1
             if k in idx: stats["matched_keys"] += 1
-    finally:
         t.Commit()
+    except:
+        if t.GetStatus() == TransactionStatus.Started:
+            t.RollBack()
+        raise
     print("[DFIT] Chiavi:", stats["matched_keys"], "| Istanze aggiornate:", stats["updated_elems"])
 
 # 9) CANALI FLESSIBILI (Flex Ducts): [Type + Diameter]
@@ -686,12 +725,12 @@ def import_flex(sheet):
         idx.setdefault((t, dk), []).append(d)
 
     # accetta sia "Diameter" che eventuali varianti ("Width/Height - Diameter" usato per rigid)
-    def key_builder(headers, r):
+    def key_builder(headers, r, get):
         tcol = headers.get("Type Name")
         dcol = headers.get("Diameter") or headers.get("Width/Height - Diameter")
         if not (tcol and dcol): return None
-        t = norm_strong(sheet.Cells(r, tcol).Value2 or u"")
-        d = to_float_dot(sheet.Cells(r, dcol).Value2); dk = round(d, 6) if d is not None else 0.0
+        t = norm_strong(get(r, tcol) or u"")
+        d = to_float_dot(get(r, dcol)); dk = round(d, 6) if d is not None else 0.0
         if not (t or dk): return None
         return (t, dk)
 
@@ -704,8 +743,11 @@ def import_flex(sheet):
             for e in idx.get(k, []):
                 if apply_two_params(e, pc, uq, stats): stats["updated_elems"] += 1
             if k in idx: stats["matched_keys"] += 1
-    finally:
         t.Commit()
+    except:
+        if t.GetStatus() == TransactionStatus.Started:
+            t.RollBack()
+        raise
     print("[FLEX] Chiavi:", stats["matched_keys"], "| Istanze aggiornate:", stats["updated_elems"])
 
 
@@ -713,13 +755,13 @@ def import_flex(sheet):
 class RunPickerForm(Form):
     def __init__(self):
         Form.__init__(self)
-        self.Text = "Revit → Excel | Seleziona cosa esportare"
+        self.Text = "Excel → Revit | HVAC | Seleziona cosa importare"
         self.StartPosition = FormStartPosition.CenterScreen
         self.FormBorderStyle = FormBorderStyle.FixedDialog
         self.MaximizeBox = False; self.MinimizeBox = False
         self.ClientSize = Size(430, 360)
 
-        lbl = Label(); lbl.Text = "Scegli le esportazioni da eseguire:"
+        lbl = Label(); lbl.Text = "Scegli le importazioni da eseguire:"
         lbl.Location = Point(16, 16); lbl.AutoSize = True
         lbl.Font = Font(self.Font, FontStyle.Bold)
         self.Controls.Add(lbl)
@@ -817,10 +859,15 @@ def main():
             except Exception as ex:
                 print("[{}] Errore: {}".format(sheet_name, ex))
 
-        workbook.Close(False)
-        excel.Quit()
 
     finally:
+        # chiusura SEMPRE, anche in caso di errore: evita EXCEL.EXE orfani
+        try:
+            if workbook: workbook.Close(False)
+        except: pass
+        try:
+            if excel: excel.Quit()
+        except: pass
         try:
             if workbook: Marshal.ReleaseComObject(workbook)
         except: pass
