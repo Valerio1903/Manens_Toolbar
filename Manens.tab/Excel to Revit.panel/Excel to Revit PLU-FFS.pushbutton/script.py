@@ -353,11 +353,12 @@ def _read_col(sheet, col, r0, r1, norm=True):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
-            try: val = data.GetValue(i, 0)
-            except:
-                try: val = data.GetValue(i+1, 1)
-                except: val = None
+            try: val = data.GetValue(i + lb0, lb1)
+            except: val = None
             out.append(_norm_text(val) if norm else val)
         return out
     if isinstance(data, (tuple, list)):
@@ -859,21 +860,41 @@ def main():
         workbook = excel.Workbooks.Open(excel_path)
 
         if run_pipe:
-            import_pipe(workbook)
+            try:
+                import_pipe(workbook)
+            except Exception as ex:
+                print("[import_pipe] Errore: {}".format(ex))
         if run_ins:
-            import_insulation(workbook)
+            try:
+                import_insulation(workbook)
+            except Exception as ex:
+                print("[import_insulation] Errore: {}".format(ex))
         if run_fit:
-            import_fittings(workbook)
+            try:
+                import_fittings(workbook)
+            except Exception as ex:
+                print("[import_fittings] Errore: {}".format(ex))
         if run_meq:
-            import_meq(workbook)
+            try:
+                import_meq(workbook)
+            except Exception as ex:
+                print("[import_meq] Errore: {}".format(ex))
         if run_gen:
-            import_general(workbook)
+            try:
+                import_general(workbook)
+            except Exception as ex:
+                print("[import_general] Errore: {}".format(ex))
 
         # chiudo Excel
-        workbook.Close(False)
-        excel.Quit()
 
     finally:
+        # chiusura SEMPRE, anche in caso di errore: evita EXCEL.EXE orfani
+        try:
+            if workbook: workbook.Close(False)
+        except: pass
+        try:
+            if excel: excel.Quit()
+        except: pass
         try:
             if workbook: Marshal.ReleaseComObject(workbook)
         except: pass
