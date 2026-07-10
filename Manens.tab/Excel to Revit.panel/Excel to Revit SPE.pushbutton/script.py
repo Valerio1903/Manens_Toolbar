@@ -32,7 +32,7 @@ from Microsoft.Office.Interop import Excel
 clr.AddReference("RevitAPI")
 from Autodesk.Revit.DB import (
     FilteredElementCollector, BuiltInParameter, BuiltInCategory, FamilyInstance,
-    Transaction, StorageType
+    Transaction, TransactionStatus, StorageType
 )
 
 # Unit conversion (Revit 2022+ / <=2021)
@@ -149,11 +149,12 @@ def xl_read_column_block(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
-            try: val = data.GetValue(i, 0)
-            except:
-                try: val = data.GetValue(i+1, 1)
-                except: val = None
+            try: val = data.GetValue(i + lb0, lb1)
+            except: val = None
             out.append(U(val).strip())
         return out
     if isinstance(data, (tuple, list)):
@@ -292,12 +293,26 @@ def build_row_map_with_syns(sheet, header_row, min_row, key_names_groups, key_bu
     if not (pc_col or uq_col):
         return {}, (r0, r1), headers, "mancano MAN_ProductCode / MAN_BoQ_Units (o sinonimi)"
 
+    # Lettura BULK dell'intera regione dati: una sola chiamata COM invece
+    # di una per cella (ogni Cells().Value2 e' un round-trip verso Excel).
+    max_col = max(headers.values()) if headers else 1
+    _blk = sheet.Range[sheet.Cells(r0, 1), sheet.Cells(r1, max_col)].Value2
+    if isinstance(_blk, System.Array) and _blk.Rank == 2:
+        _lb0 = _blk.GetLowerBound(0); _lb1 = _blk.GetLowerBound(1)
+        def get(r, c):
+            try: return _blk.GetValue(r - r0 + _lb0, c - 1 + _lb1)
+            except: return None
+    else:
+        _scal = _blk
+        def get(r, c):
+            return _scal if (r == r0 and c == 1) else None
+
     result = {}
     for r in range(r0, r1+1):
-        key = key_builder(headers, col_idxs, r)
+        key = key_builder(headers, col_idxs, r, get)
         if not key: continue
-        pc = sheet.Cells(r, pc_col).Value2 if pc_col else None
-        uq = sheet.Cells(r, uq_col).Value2 if uq_col else None
+        pc = get(r, pc_col) if pc_col else None
+        uq = get(r, uq_col) if uq_col else None
         if (pc is None or U(pc).strip()==u"") and (uq is None or U(uq).strip()==u""):
             continue
         result[key] = (U(pc).strip() if pc is not None else u"", U(uq).strip() if uq is not None else u"")
@@ -345,12 +360,12 @@ def import_generale(sheet):
         if not (fam or typ): continue
         idx.setdefault((fam, typ), []).append(e)
 
-    def key_builder(headers, col_idxs, r):
+    def key_builder(headers, col_idxs, r, get):
         fcol = col_idxs.get("Family Name")
         tcol = col_idxs.get("Type Name")
         if not (fcol and tcol): return None
-        fam = norm_strong(sheet.Cells(r, fcol).Value2 or u"")
-        typ = norm_strong(sheet.Cells(r, tcol).Value2 or u"")
+        fam = norm_strong(get(r, fcol) or u"")
+        typ = norm_strong(get(r, tcol) or u"")
         if not (fam or typ): return None
         # coerente all'export: non filtriamo qui; l'indice già contiene solo i target
         return (fam, typ)
@@ -376,8 +391,11 @@ def import_generale(sheet):
             for e in lst:
                 if apply_two_params(e, pc, uq, stats):
                     stats["updated_elems"] += 1
-    finally:
         t.Commit()
+    except:
+        if t.GetStatus() == TransactionStatus.Started:
+            t.RollBack()
+        raise
     print("[GEN] Chiavi corrisposte: {} | Istanze aggiornate: {}".format(stats["matched_keys"], stats["updated_elems"]))
 
 # ------------------- IMPORT: CAVIDOTTI (Thermo/Air) -------------------
@@ -394,12 +412,12 @@ def import_cavidotti(sheet):
         if dk <= 0: continue
         idx.setdefault((t, dk), []).append(e)
 
-    def key_builder(headers, col_idxs, r):
+    def key_builder(headers, col_idxs, r, get):
         tcol = col_idxs.get("Type Name")
         dcol = col_idxs.get("Outside Diameter")
         if not (tcol and dcol): return None
-        t = norm_strong(sheet.Cells(r, tcol).Value2 or u"")
-        dv = to_float_dot(sheet.Cells(r, dcol).Value2); dk = round(dv, 6) if dv is not None else 0.0
+        t = norm_strong(get(r, tcol) or u"")
+        dv = to_float_dot(get(r, dcol)); dk = round(dv, 6) if dv is not None else 0.0
         if not (t or dk): return None
         return (t, dk)
 
@@ -424,8 +442,11 @@ def import_cavidotti(sheet):
             for e in lst:
                 if apply_two_params(e, pc, uq, stats):
                     stats["updated_elems"] += 1
-    finally:
         t.Commit()
+    except:
+        if t.GetStatus() == TransactionStatus.Started:
+            t.RollBack()
+        raise
     print("[CAVIDOTTI] Chiavi corrisposte: {} | Istanze aggiornate: {}".format(stats["matched_keys"], stats["updated_elems"]))
 
 # ------------------- UI -------------------
@@ -523,10 +544,15 @@ def main():
                     print("[Cavidotti] Errore: {}".format(ex))
 
         # solo lettura: non salviamo Excel
-        workbook.Close(False)
-        excel.Quit()
 
     finally:
+        # chiusura SEMPRE, anche in caso di errore: evita EXCEL.EXE orfani
+        try:
+            if workbook: workbook.Close(False)
+        except: pass
+        try:
+            if excel: excel.Quit()
+        except: pass
         try:
             if workbook: Marshal.ReleaseComObject(workbook)
         except: pass
