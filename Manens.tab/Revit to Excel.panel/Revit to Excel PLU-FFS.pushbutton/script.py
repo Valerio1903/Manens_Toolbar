@@ -284,14 +284,14 @@ def _read_column_block_pipe(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
             try:
-                val = data.GetValue(i, 0)
+                val = data.GetValue(i + lb0, lb1)
             except:
-                try:
-                    val = data.GetValue(i+1, 1)
-                except:
-                    val = None
+                val = None
             out.append(_norm_text_pipe(val))
         return out
     if isinstance(data, (tuple, list)):
@@ -733,14 +733,14 @@ def _read_column_block_ins(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
             try:
-                val = data.GetValue(i, 0)
+                val = data.GetValue(i + lb0, lb1)
             except:
-                try:
-                    val = data.GetValue(i+1, 1)
-                except:
-                    val = None
+                val = None
             out.append(_norm_text_ins(val))
         return out
     if isinstance(data, (tuple, list)):
@@ -1185,14 +1185,14 @@ def _read_column_block_fit(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
             try:
-                val = data.GetValue(i, 0)
+                val = data.GetValue(i + lb0, lb1)
             except:
-                try:
-                    val = data.GetValue(i+1, 1)
-                except:
-                    val = None
+                val = None
             out.append(_u_fit(val).strip())
         return out
     if isinstance(data, (tuple, list)):
@@ -1636,11 +1636,12 @@ def MEQ_read_column_block(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
-            try: val = data.GetValue(i, 0)
-            except:
-                try: val = data.GetValue(i+1, 1)
-                except: val = None
+            try: val = data.GetValue(i + lb0, lb1)
+            except: val = None
             out.append(MEQ_u(val).strip())
         return out
     if isinstance(data, (tuple, list)):
@@ -2061,11 +2062,12 @@ def GEN_read_column_block(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
-            try: val = data.GetValue(i, 0)
-            except:
-                try: val = data.GetValue(i+1, 1)
-                except: val = None
+            try: val = data.GetValue(i + lb0, lb1)
+            except: val = None
             out.append(GEN_u(val).strip())
         return out
     if isinstance(data, (tuple, list)):
@@ -2361,21 +2363,41 @@ def main():
         workbook = excel.Workbooks.Open(excel_path)
 
         if run_pipe:
-            run_pipe_into_workbook(workbook)
+            try:
+                run_pipe_into_workbook(workbook)
+            except Exception as ex:
+                print("[run_pipe_into_workbook] Errore: {}".format(ex))
         if run_ins:
-            run_ins_into_workbook(workbook)
+            try:
+                run_ins_into_workbook(workbook)
+            except Exception as ex:
+                print("[run_ins_into_workbook] Errore: {}".format(ex))
         if run_fit:
-            run_fittings_into_workbook(workbook)
+            try:
+                run_fittings_into_workbook(workbook)
+            except Exception as ex:
+                print("[run_fittings_into_workbook] Errore: {}".format(ex))
         if run_meq:
-            run_mechanical_equipment_into_workbook(workbook)
+            try:
+                run_mechanical_equipment_into_workbook(workbook)
+            except Exception as ex:
+                print("[run_mechanical_equipment_into_workbook] Errore: {}".format(ex))
         if run_gen:
-            run_general_into_workbook(workbook)
+            try:
+                run_general_into_workbook(workbook)
+            except Exception as ex:
+                print("[run_general_into_workbook] Errore: {}".format(ex))
         # 4) salva & chiudi
         workbook.Save()
-        workbook.Close(True)
-        excel.Quit()
 
     finally:
+        # chiusura SEMPRE, anche in caso di errore: evita EXCEL.EXE orfani
+        try:
+            if workbook: workbook.Close(False)
+        except: pass
+        try:
+            if excel: excel.Quit()
+        except: pass
         try:
             if workbook: Marshal.ReleaseComObject(workbook)
         except: pass
