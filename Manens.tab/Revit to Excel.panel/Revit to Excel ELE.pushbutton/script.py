@@ -338,11 +338,12 @@ def PAS_read_column_block(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
-            try: val = data.GetValue(i, 0)
-            except:
-                try: val = data.GetValue(i+1, 1)
-                except: val = None
+            try: val = data.GetValue(i + lb0, lb1)
+            except: val = None
             out.append(PAS_u(val).strip())
         return out
     if isinstance(data, (tuple, list)):
@@ -746,11 +747,12 @@ def SEP_read_column_block(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
-            try: val = data.GetValue(i, 0)
-            except:
-                try: val = data.GetValue(i+1, 1)
-                except: val = None
+            try: val = data.GetValue(i + lb0, lb1)
+            except: val = None
             out.append(PAS_u(val).strip())
         return out
     if isinstance(data, (tuple, list)):
@@ -1120,11 +1122,12 @@ def COND_read_column_block(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
-            try: val = data.GetValue(i, 0)
-            except:
-                try: val = data.GetValue(i+1, 1)
-                except: val = None
+            try: val = data.GetValue(i + lb0, lb1)
+            except: val = None
             out.append(PAS_u(val).strip())
         return out
     if isinstance(data, (tuple, list)):
@@ -1566,11 +1569,12 @@ def EEQ_read_column_block(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
-            try: val = data.GetValue(i, 0)
-            except:
-                try: val = data.GetValue(i+1, 1)
-                except: val = None
+            try: val = data.GetValue(i + lb0, lb1)
+            except: val = None
             out.append(EEQ_u(val).strip())
         return out
     if isinstance(data, (tuple, list)):
@@ -2019,11 +2023,12 @@ def GEN_read_column_block(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
-            try: val = data.GetValue(i, 0)
-            except:
-                try: val = data.GetValue(i+1, 1)
-                except: val = None
+            try: val = data.GetValue(i + lb0, lb1)
+            except: val = None
             out.append(GEN_u(val).strip())
         return out
     if isinstance(data, (tuple, list)):
@@ -2469,14 +2474,14 @@ def _read_column_block_pipe(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
             try:
-                val = data.GetValue(i, 0)
+                val = data.GetValue(i + lb0, lb1)
             except:
-                try:
-                    val = data.GetValue(i+1, 1)
-                except:
-                    val = None
+                val = None
             out.append(_norm_text_pipe(val))
         return out
     if isinstance(data, (tuple, list)):
@@ -2898,14 +2903,14 @@ def _read_column_block_fit(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
             try:
-                val = data.GetValue(i, 0)
+                val = data.GetValue(i + lb0, lb1)
             except:
-                try:
-                    val = data.GetValue(i+1, 1)
-                except:
-                    val = None
+                val = None
             out.append(_u_fit(val).strip())
         return out
     if isinstance(data, (tuple, list)):
@@ -3336,11 +3341,12 @@ def _read_column_block_duct(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
-            try: val = data.GetValue(i, 0)
-            except:
-                try: val = data.GetValue(i+1, 1)
-                except: val = None
+            try: val = data.GetValue(i + lb0, lb1)
+            except: val = None
             out.append(_u_duct(val).strip())
         return out
     if isinstance(data, (tuple, list)):
@@ -3805,14 +3811,14 @@ def DFT_read_column_block(sheet, col, r0, r1):
     out = []
     if isinstance(data, System.Array) and data.Rank == 2:
         n0 = data.GetLength(0)
+        # Gli array COM di Excel sono 1-based: GetValue(i,0) falliva SEMPRE
+        # e ripiegava su GetValue(i+1,1) al costo di un'eccezione per cella.
+        lb0 = data.GetLowerBound(0); lb1 = data.GetLowerBound(1)
         for i in range(n0):
             try:
-                val = data.GetValue(i, 0)
+                val = data.GetValue(i + lb0, lb1)
             except:
-                try:
-                    val = data.GetValue(i+1, 1)
-                except:
-                    val = None
+                val = None
             out.append(DFT_u(val).strip())
         return out
     if isinstance(data, (tuple, list)):
@@ -4132,33 +4138,65 @@ def main():
 
         workbook = excel.Workbooks.Open(excel_path)
         if run_tray:
-            run_cable_trays_into_workbook(workbook)
+            try:
+                run_cable_trays_into_workbook(workbook)
+            except Exception as ex:
+                print("[run_cable_trays_into_workbook] Errore: {}".format(ex))
         if run_tray_sep:
-            run_cable_tray_separators_into_workbook(workbook)
+            try:
+                run_cable_tray_separators_into_workbook(workbook)
+            except Exception as ex:
+                print("[run_cable_tray_separators_into_workbook] Errore: {}".format(ex))
         if run_cond:
-            run_conduits_into_workbook(workbook)
+            try:
+                run_conduits_into_workbook(workbook)
+            except Exception as ex:
+                print("[run_conduits_into_workbook] Errore: {}".format(ex))
         if run_eeq:
-            run_electrical_equipment_into_workbook(workbook)
+            try:
+                run_electrical_equipment_into_workbook(workbook)
+            except Exception as ex:
+                print("[run_electrical_equipment_into_workbook] Errore: {}".format(ex))
         if run_gen:
-            run_general_into_workbook(workbook)
+            try:
+                run_general_into_workbook(workbook)
+            except Exception as ex:
+                print("[run_general_into_workbook] Errore: {}".format(ex))
         if run_pipe:
-            run_pipe_into_workbook(workbook)
+            try:
+                run_pipe_into_workbook(workbook)
+            except Exception as ex:
+                print("[run_pipe_into_workbook] Errore: {}".format(ex))
         if run_fit:
-            run_fittings_into_workbook(workbook)
+            try:
+                run_fittings_into_workbook(workbook)
+            except Exception as ex:
+                print("[run_fittings_into_workbook] Errore: {}".format(ex))
         if run_duct:
-            run_ducts_into_workbook(workbook)
+            try:
+                run_ducts_into_workbook(workbook)
+            except Exception as ex:
+                print("[run_ducts_into_workbook] Errore: {}".format(ex))
         if run_dft:
-            run_duct_fittings_into_workbook(workbook)
+            try:
+                run_duct_fittings_into_workbook(workbook)
+            except Exception as ex:
+                print("[run_duct_fittings_into_workbook] Errore: {}".format(ex))
 
 
 
 
         # 4) salva & chiudi
         workbook.Save()
-        workbook.Close(True)
-        excel.Quit()
 
     finally:
+        # chiusura SEMPRE, anche in caso di errore: evita EXCEL.EXE orfani
+        try:
+            if workbook: workbook.Close(False)
+        except: pass
+        try:
+            if excel: excel.Quit()
+        except: pass
         try:
             if workbook: Marshal.ReleaseComObject(workbook)
         except: pass
